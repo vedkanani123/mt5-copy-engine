@@ -1,0 +1,9 @@
+drop index if exists public.one_master_per_workspace;
+alter table public.trading_accounts add column if not exists group_name text not null default 'Default group';
+create table if not exists public.copy_groups(id uuid primary key default gen_random_uuid(), workspace_id uuid not null references public.workspaces(id) on delete cascade, name text not null, description text, master_account_id uuid references public.trading_accounts(id) on delete set null, enabled boolean not null default true, created_at timestamptz not null default now(), unique(workspace_id,name));
+create table if not exists public.copy_group_accounts(group_id uuid not null references public.copy_groups(id) on delete cascade, account_id uuid not null references public.trading_accounts(id) on delete cascade, role text not null check(role in ('MASTER','SLAVE')), copy_enabled boolean not null default true, created_at timestamptz not null default now(), primary key(group_id,account_id));
+create unique index if not exists one_group_master on public.copy_group_accounts(group_id) where role='MASTER';
+alter table public.copy_groups enable row level security; alter table public.copy_group_accounts enable row level security;
+create policy "member groups" on public.copy_groups for all to authenticated using(public.is_workspace_member(workspace_id)) with check(public.is_workspace_member(workspace_id));
+create policy "member group accounts" on public.copy_group_accounts for all to authenticated using(exists(select 1 from public.copy_groups g where g.id=group_id and public.is_workspace_member(g.workspace_id))) with check(exists(select 1 from public.copy_groups g where g.id=group_id and public.is_workspace_member(g.workspace_id)));
+create index if not exists trading_accounts_group_idx on public.trading_accounts(workspace_id,group_name);

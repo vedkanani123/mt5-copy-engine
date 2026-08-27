@@ -1,1 +1,2 @@
+@import './key.css';
 .auth-tabs{display:grid;grid-template-columns:1fr 1fr;background:#0b0b10;border:1px solid #2b2738;border-radius:8px;padding:3px;margin:0 0 20px}.auth-tab{border:0;background:transparent;color:#777483;border-radius:6px;padding:9px;font-size:11px}.auth-tab.selected{background:#29203e;color:#e8ddff}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.optional{color:#686573;font-size:10px}.success{color:#6ee7a9;font-size:11px;line-height:1.5}.primary:disabled{opacity:.6;cursor:wait}

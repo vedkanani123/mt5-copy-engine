@@ -1,0 +1,2 @@
+create or replace function public.set_account_workspace() returns trigger language plpgsql security invoker set search_path=public as $$ begin if new.workspace_id is null then select workspace_id into new.workspace_id from public.workspace_members where user_id=(select auth.uid()) order by created_at limit 1; end if; return new; end; $$;
+create trigger trading_accounts_workspace_default before insert on public.trading_accounts for each row execute function public.set_account_workspace();

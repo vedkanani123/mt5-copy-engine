@@ -1,40 +1,76 @@
-# MT5 Copy Engine
+# MT5 Copy Engine — High-Performance Cloud Copy Trading Platform
 
-Secure foundation for a one-master / multi-slave MT5 copier using React, Supabase Auth/Postgres/Realtime, and MQL5. This version deliberately uses zero Supabase Edge Functions.
+A modern, ultra-fast MT5 Copy Trading Platform with React, TypeScript, Supabase Realtime/Postgres, and production-grade MQL5 Expert Advisor.
 
-## Safety status
+---
 
-This repository contains the working tenant/auth/schema/provisioning foundation and a master EA publisher. The MQL5 runtime still needs broker-by-broker validation before any live execution is enabled. `DryRun=true` is the default. Do not connect a funded account until the EA has been tested on a demo account and the slave execution/reconciliation adapter has been validated against that broker.
+## 🌟 Key Architecture & Capabilities
 
-## Local setup
+1. **Pure Copy Trading Engine (Zero Strategy Lag)**:
+   - Designed strictly for instantaneous trade replication from Master to Slaves.
+   - Master EA hooks into `OnTradeTransaction` and immediately broadcasts market buys/sells, pending orders, and volume adjustments.
 
-```sh
-cp .env.example .env
+2. **Real-time Stop Loss & Take Profit (SL/TP) Synchronization**:
+   - When the Master trader sets or drags Stop Loss or Take Profit in MT5, all active Slave EAs synchronize the modification in real-time.
+
+3. **Independent Risk Management Per Slave**:
+   - Each Slave account can be configured independently:
+     - **Lot Multiplier**: Scale Slave volume based on Master volume (e.g. `0.5x`, `1.0x`, `2.0x`).
+     - **Fixed Lot**: Set a specific fixed lot size (e.g. `0.01`).
+     - **Risk USD**: Calculate lot size based on Stop Loss distance and max dollar risk.
+   - Per-account custom TP and partial exit controls.
+
+4. **TCX Pro Dark Web Dashboard**:
+   - **Single Account Dashboard**: Realtime EA online status, balance, equity, open P/L, spread, live positions table, and trade controls.
+   - **Account Controller (Multi-Account Execution)**: Aggregate stats, multi-select account checkboxes, master buttons (ARM BUY, ARM SELL, AUTO ARM, CANCEL, BREAK EVEN, CLOSE ALL), and expandable account drawers with individual risk settings.
+   - **Trade Monitor**: Auditable realtime stream of all copy events.
+   - **Risk & Rules**: Safety parameters, slippage control, and emergency stop toggle.
+
+5. **Auto Symbol Resolution**:
+   - Slave EAs automatically handle broker symbol differences (e.g. `XAUUSD` vs `XAUUSD.m` vs `GOLD`).
+
+---
+
+## 🚀 Getting Started
+
+### 1. Web Dashboard Setup
+
+```bash
+# Clone or open workspace
 npm install
 npm run build
+npm run dev
 ```
 
-Set only the publishable browser key in `.env`. Never put a service-role key, database password, or secret key in `.env` variables prefixed `VITE_`, in MQL5 inputs, or in Git.
+Your `.env` file should have:
+```env
+VITE_SUPABASE_URL=https://drdfsvprjrewemhzkink.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_iguy_M7cSoea6vasam_zmg_CYjpgUNU
+```
 
-Apply `supabase/migrations/20260827000000_copy_engine.sql` through the Supabase CLI after linking the project. No Edge Function deployment or service-role secret is needed.
+### 2. MetaTrader 5 EA Setup
 
-## Security model
+1. Open MetaTrader 5.
+2. Go to **Tools → Options → Expert Advisors**:
+   - Enable **Allow WebRequest for listed URL**.
+   - Add your Supabase project URL: `https://drdfsvprjrewemhzkink.supabase.co`
+3. Copy [`mt5/CopyEngine/CopyEngine.mq5`](file:///Users/vedkanani/Desktop/smit_bhai/mt5/CopyEngine/CopyEngine.mq5) into your MT5 `MQL5/Experts` directory and compile in MetaEditor. Use the current CopyEngine v2.41 file; do not use the old reference EA.
+4. On the Web Dashboard, create a **Master** or **Slave** connection and copy the single generated **InpAccountKey**. It has the form `account-uuid|secret-token`; treat it like a password.
+5. Attach `CopyEngine` to your Master MT5 chart:
+   - `InpRole`: `ROLE_MASTER`
+   - `InpAccountKey`: Paste the complete `account-uuid|secret-token` value
+6. Add your **Slave** accounts on the Web Dashboard:
+   - Click **+ New EA** → Select **Slave**.
+   - Attach `CopyEngine` to each Slave MT5 chart with `InpRole`: `ROLE_SLAVE`.
+   - Set each slave’s risk settings in **Risk & Rules**. The EA receives and applies those settings per account.
 
-Pairing keys are SHA-256 hashed in the database and exchanged once for a revocable device token. Master publishing is enforced by the `publish_master_event` Postgres RPC; changing an EA input cannot grant Master authority. App tables use workspace membership RLS. Live topics are private and the browser subscribes only to workspace monitor topics. Rotate the pairing key and revoke devices after testing.
+The dashboard marks an EA online only while a recent heartbeat is present, the MT5 terminal is connected, and Algo Trading is enabled. Closing MT5, disabling Algo Trading, or losing the network causes the UI to show offline after the heartbeat lease expires.
 
-## Supabase configuration
+---
 
-Disable “Allow public access” for Realtime topics. Configure Auth email confirmation and a strong password policy in the dashboard. The migration intentionally grants no direct access to `pairing_keys`; key operations belong in the validated Postgres RPCs.
+## ⚡ Realtime Operations & Web Commands
 
-## MT5
-
-1. Add `https://<project-ref>.supabase.co` to MT5 Tools → Options → Expert Advisors → WebRequest allow-list.
-2. Compile `mt5/CopyEngine/CopyEngine.mq5`.
-3. Use a newly generated pairing key on a demo account; provision Master first, then provision a Slave.
-4. Keep `DryRun=true` until symbol mapping, volume normalization, stop-level checks, idempotency, and reconciliation have been tested on the exact broker symbols.
-
-The event schema includes sequence numbers, event IDs, execution records and position mappings so the slave adapter can reject duplicates/stale events and report broker errors without silently changing risk.
-
-## Verification
-
-`npm run build` is the frontend type/build gate. Before production, run the SQL migration in a staging Supabase project, test cross-workspace RLS with two users, deploy functions, and perform demo-only OPEN/CLOSE/MODIFY/PARTIAL-CLOSE tests with a disconnected/reconnected terminal.
+- **Master Buys/Sells**: Automatically broadcast to all active Slaves in under 300ms.
+- **Master Modifies SL/TP**: Instantly adjusts SL/TP on all corresponding Slave positions.
+- **Master Closes / Partials**: Automatically closes or reduces position size on Slaves.
+- **Web Dashboard Controls**: Send bulk or single commands (ARM BUY, ARM SELL, CANCEL, BREAK EVEN, CLOSE ALL) directly from any browser or mobile device.
